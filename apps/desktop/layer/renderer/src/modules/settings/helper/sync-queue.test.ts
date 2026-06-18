@@ -149,4 +149,22 @@ describe("desktop spotlight setting sync", () => {
       }),
     )
   })
+
+  test("BYOK settings are excluded from server sync payload", async () => {
+    const { initializeDefaultSettings, setAISetting } = await import("~/atoms/settings/ai")
+    initializeDefaultSettings()
+    setAISetting("byok", {
+      enabled: true,
+      providers: [{ provider: "openai", apiKey: "sk-secret", modelId: "gpt-4o-mini" }],
+    })
+
+    await settingSyncQueue.init()
+    const syncPromise = settingSyncQueue.replaceRemote("ai")
+    await syncPromise
+
+    const updatePayload = settingsUpdateMock.mock.calls.at(-1)?.[0] as Record<string, unknown>
+    expect(updatePayload?.tab).toBe("ai")
+    expect(updatePayload).not.toHaveProperty("byok")
+    expect(JSON.stringify(updatePayload)).not.toContain("sk-secret")
+  })
 })

@@ -22,6 +22,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/google": "3.0.83",
+    "@ai-sdk/openai": "3.0.73",
     "@electron-toolkit/preload": "3.0.2",
     "@electron-toolkit/utils": "4.0.0",
     "@eneris/push-receiver": "4.3.0",
@@ -29,6 +31,7 @@
     "@follow-app/readability": "workspace:*",
     "@follow/shared": "workspace:*",
     "@follow/utils": "workspace:*",
+    "ai": "6.0.85",
     "builder-util-runtime": "9.5.1",
     "electron-context-menu": "4.1.1",
     "electron-ipc-decorator": "0.2.0",
@@ -43,6 +46,7 @@
     "ky": "1.14.3",
     "linkedom": "0.18.12",
     "lowdb": "7.0.1",
+    "nanoid": "5.1.6",
     "node-machine-id": "1.1.12",
     "ofetch": "1.5.1",
     "pathe": "2.0.3",

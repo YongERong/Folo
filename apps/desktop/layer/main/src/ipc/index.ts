@@ -1,6 +1,7 @@
 import type { MergeIpcService } from "electron-ipc-decorator"
 import { createServices } from "electron-ipc-decorator"
 
+import { AIService } from "./services/ai"
 import { AppService } from "./services/app"
 import { AuthService } from "./services/auth"
 import { CliService } from "./services/cli"
@@ -14,6 +15,7 @@ import { SettingService } from "./services/setting"
 // Initialize all services
 const services = createServices([
   AppService,
+  AIService,
   AuthService,
   CliService,
   DebugService,

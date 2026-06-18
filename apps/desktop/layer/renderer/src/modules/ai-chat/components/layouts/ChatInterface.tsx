@@ -24,6 +24,7 @@ import { ErrorBoundary } from "~/components/common/ErrorBoundary"
 import { ROUTE_FEED_IN_FOLDER } from "~/constants"
 import { getRouteParams } from "~/hooks/biz/useRouteParams"
 import { useRequireLogin } from "~/hooks/common/useRequireLogin"
+import { isByokActive } from "~/modules/ai-byok/routing"
 import { useAutoScroll } from "~/modules/ai-chat/hooks/useAutoScroll"
 import { useLoadMessages } from "~/modules/ai-chat/hooks/useLoadMessages"
 import { useMainEntryId } from "~/modules/ai-chat/hooks/useMainEntryId"
@@ -258,11 +259,13 @@ const ChatInterfaceContent = ({ centerInputOnEmpty, visualOffsetY }: ChatInterfa
 
   const { data: configuration } = useAIConfiguration()
   const shouldHideResetDetails = userRole ? isFreeRole(userRole) : false
+  const byokActive = isByokActive()
 
   const { isRateLimited, rateLimitMessage } = useRateLimitInfo(
     error,
     configuration,
     shouldHideResetDetails,
+    byokActive,
   )
 
   return (
@@ -395,18 +398,21 @@ const useRateLimitInfo = (
   error: Error | string | undefined,
   configuration: ConfigResponse | undefined,
   shouldHideResetDetails: boolean,
+  byokActive: boolean,
 ) => {
   const isRateLimited = useMemo(
-    () => computeIsRateLimited(error, configuration),
-    [error, configuration],
+    () => (byokActive ? false : computeIsRateLimited(error, configuration)),
+    [byokActive, error, configuration],
   )
 
   const rateLimitMessage = useMemo(
     () =>
-      computeRateLimitMessage(error, configuration, {
-        hideResetDetails: shouldHideResetDetails,
-      }),
-    [error, configuration, shouldHideResetDetails],
+      byokActive
+        ? null
+        : (computeRateLimitMessage(error, configuration, {
+            hideResetDetails: shouldHideResetDetails,
+          }) ?? null),
+    [byokActive, error, configuration, shouldHideResetDetails],
   )
 
   return {

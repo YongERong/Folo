@@ -3,10 +3,11 @@ import type { TranslationSchema } from "@follow/database/schemas/types"
 import { TranslationService } from "@follow/database/services/translation"
 import type { SupportedActionLanguage } from "@follow/shared"
 import { toApiSupportedActionLanguage } from "@follow/shared"
+import { buildByokTranslationPrompt } from "@follow/shared/ai/prompts"
 import { checkLanguage } from "@follow/utils/language"
 import { create, indexedResolver, windowScheduler } from "@yornaath/batshit"
 
-import { api } from "../../context"
+import { api, getByokServices, isByokActiveInStore } from "../../context"
 import type { Hydratable, Resetable } from "../../lib/base"
 import { createImmerSetter, createTransaction, createZustandStore } from "../../lib/helper"
 import { readNdjsonStream } from "../../lib/stream"
@@ -232,7 +233,7 @@ class TranslationSyncService {
   }) {
     const userRole = useUserStore.getState().role
 
-    if (userRole === UserRole.Free) return null
+    if (userRole === UserRole.Free && !isByokActiveInStore()) return null
     const translationMode = mode ?? "bilingual"
     await this.ensureMode(translationMode)
 
@@ -257,9 +258,90 @@ class TranslationSyncService {
 
     if (fields.length === 0) return null
 
+    if (isByokActiveInStore()) {
+      return this.generateTranslationWithByok({
+        entryId,
+        entry,
+        language,
+        fields,
+        mode: translationMode,
+      })
+    }
+
     const key = `${entryId}|${language}|${target}|${fields.join(",")}|${translationMode}`
     const result = await this.translationBatcher.fetch(key)
     return result || null
+  }
+
+  private async generateTranslationWithByok({
+    entryId,
+    entry,
+    language,
+    fields,
+    mode,
+  }: {
+    entryId: string
+    entry: NonNullable<ReturnType<typeof getEntry>>
+    language: SupportedActionLanguage
+    fields: TranslationFieldArray
+    mode: TranslationMode
+  }) {
+    const byok = getByokServices()
+    if (!byok?.isActive()) {
+      return null
+    }
+
+    const payload: Partial<Record<keyof TranslationModel, string>> = {}
+    for (const field of fields) {
+      const value = entry[field]
+      if (typeof value === "string" && value.trim()) {
+        payload[field] = value
+      }
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return null
+    }
+
+    const response = await byok.generateText({
+      prompt: buildByokTranslationPrompt(payload, language, mode),
+      system:
+        mode === "translation-only"
+          ? "Return valid JSON only. Do not wrap the response in markdown fences."
+          : undefined,
+    })
+
+    if (!response) return null
+
+    let parsed: Partial<Record<keyof TranslationModel, string>> = payload
+    if (mode === "translation-only") {
+      try {
+        parsed = JSON.parse(response) as Partial<Record<keyof TranslationModel, string>>
+      } catch {
+        parsed = payload
+      }
+    } else {
+      for (const field of fields) {
+        const original = payload[field]
+        if (!original) continue
+        parsed[field] = response.includes(original)
+          ? response.slice(response.indexOf(original) + original.length).trim() || response
+          : response
+      }
+    }
+
+    const translation: TranslationModel = {
+      entryId,
+      language,
+      title: typeof parsed.title === "string" ? parsed.title : null,
+      description: typeof parsed.description === "string" ? parsed.description : null,
+      content: typeof parsed.content === "string" ? parsed.content : null,
+      readabilityContent:
+        typeof parsed.readabilityContent === "string" ? parsed.readabilityContent : null,
+    }
+
+    await translationActions.upsertMany([translation])
+    return translation
   }
 }
 

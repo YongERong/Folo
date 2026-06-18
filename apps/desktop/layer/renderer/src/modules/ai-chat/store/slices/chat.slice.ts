@@ -33,6 +33,7 @@ export const createChatSlice: (options: {
               })
             },
           }),
+          getScene: () => get().scene,
         }),
         generateId,
       },

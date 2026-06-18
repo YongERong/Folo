@@ -1,7 +1,7 @@
 import { FollowAPIError } from "@follow-app/client-sdk"
 import { beforeEach, describe, expect, test, vi } from "vitest"
 
-import { apiContext } from "../../context"
+import { apiContext, provideByokServices } from "../../context"
 import type { FollowAPI } from "../../types"
 import { useEntryStore } from "../entry/store"
 import type { EntryModel } from "../entry/types"
@@ -36,6 +36,11 @@ describe("summarySyncService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+
+    provideByokServices({
+      isActive: () => false,
+      generateText: async () => null,
+    })
 
     useEntryStore.setState({
       data: {
@@ -77,6 +82,34 @@ describe("summarySyncService", () => {
       ).toBe(SummaryGeneratingStatus.Success)
     },
   )
+
+  test("uses BYOK generateText when BYOK is active", async () => {
+    const generateTextMock = vi.fn().mockResolvedValue("BYOK summary")
+    provideByokServices({
+      isActive: () => true,
+      generateText: generateTextMock,
+    })
+
+    useEntryStore.setState({
+      data: {
+        [entryId]: {
+          ...createEntry(entryId),
+          content: "Article body",
+        },
+      },
+    })
+
+    await expect(
+      summarySyncService.generateSummary({
+        entryId,
+        target,
+        actionLanguage,
+      }),
+    ).resolves.toBe("BYOK summary")
+
+    expect(summaryApiMock).not.toHaveBeenCalled()
+    expect(generateTextMock).toHaveBeenCalled()
+  })
 
   test("keeps real API payment errors for the upgrade prompt", async () => {
     const paymentError = new FollowAPIError("Payment required", 402)

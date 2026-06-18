@@ -106,7 +106,7 @@
   "integration.mcp.services.empty.description": "Connectez des services MCP pour étendre les capacités de l'IA avec des outils externes, des API et des sources de données.",
   "integration.mcp.services.empty.title": "Aucun service MCP connecté",
   "integration.mcp.services.title": "Services MCP",
-  "integration.security.description": "Les jetons d'authentification OAuth et les clés API AI BYOK sont stockés en toute sécurité à l'aide du chiffrement AES-GCM-256 pour protéger vos informations d'identification et garantir la confidentialité des données.",
+  "integration.security.description": "Les jetons d'authentification OAuth sont stockés en toute sécurité sur votre appareil. Les clés API AI BYOK sont stockées localement dans le trousseau système via Electron et ne sont jamais envoyées aux serveurs Folo.",
   "integration.security.title": "Divulgation de sécurité",
   "integration.title": "Intégration",
   "memories.actions.load_more": "Charger plus",

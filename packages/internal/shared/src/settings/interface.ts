@@ -234,7 +234,9 @@ export type ByokProviderName = "openai" | "google" | "vercel-ai-gateway" | "open
 export type UserByokProviderConfig = {
   provider: ByokProviderName
   baseURL?: string | null
+  /** Stored in Electron safeStorage only — never persist in synced/local settings JSON */
   apiKey?: string | null
+  modelId?: string | null
   headers?: Record<string, string>
 }
 

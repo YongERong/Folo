@@ -1,16 +1,22 @@
 import { Button } from "@follow/components/ui/button/index.js"
 import { Label } from "@follow/components/ui/label/index.jsx"
 import { Switch } from "@follow/components/ui/switch/index.jsx"
+import { IN_ELECTRON } from "@follow/shared/constants"
 import type { UserByokProviderConfig } from "@follow/shared/settings/interface"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { getAISettings, setAISetting, useAISettingValue } from "~/atoms/settings/ai"
 import { useDialog, useModalStack } from "~/components/ui/modal/stacked/hooks"
+import { deleteByokApiKey, stripApiKeyFromProviderConfig } from "~/modules/ai-byok/key-vault"
 
 import { ByokProviderItem } from "./ByokProviderItem"
 import { ByokProviderModalContent } from "./ByokProviderModalContent"
 import { PROVIDER_OPTIONS } from "./constants"
+
+const persistProvider = async (provider: UserByokProviderConfig) => {
+  return stripApiKeyFromProviderConfig(provider)
+}
 
 export const ByokSection = () => {
   const { t } = useTranslation("ai")
@@ -36,11 +42,12 @@ export const ByokSection = () => {
         <ByokProviderModalContent
           provider={null}
           configuredProviders={configuredProviders}
-          onSave={(provider) => {
+          onSave={async (provider) => {
+            const sanitized = await persistProvider(provider)
             const updatedByok = getAISettings().byok ?? { enabled: false, providers: [] }
             setAISetting("byok", {
               ...updatedByok,
-              providers: [...updatedByok.providers, provider],
+              providers: [...updatedByok.providers, sanitized],
             })
             toast.success(t("byok.providers.added"))
             dismiss()
@@ -53,7 +60,6 @@ export const ByokSection = () => {
 
   const handleEditProvider = (index: number, provider: UserByokProviderConfig) => {
     const currentByok = getAISettings().byok ?? { enabled: false, providers: [] }
-    // Exclude the current provider being edited from configured list
     const configuredProviders = currentByok.providers
       .filter((_, i) => i !== index)
       .map((p) => p.provider)
@@ -64,10 +70,11 @@ export const ByokSection = () => {
         <ByokProviderModalContent
           provider={provider}
           configuredProviders={configuredProviders}
-          onSave={(updatedProvider) => {
+          onSave={async (updatedProvider) => {
+            const sanitized = await persistProvider(updatedProvider)
             const updatedByok = getAISettings().byok ?? { enabled: false, providers: [] }
             const updatedProviders = [...updatedByok.providers]
-            updatedProviders[index] = updatedProvider
+            updatedProviders[index] = sanitized
             setAISetting("byok", {
               ...updatedByok,
               providers: updatedProviders,
@@ -92,6 +99,10 @@ export const ByokSection = () => {
 
     if (confirmed) {
       const currentByok = getAISettings().byok ?? { enabled: false, providers: [] }
+      const providerToDelete = currentByok.providers[index]
+      if (providerToDelete) {
+        await deleteByokApiKey(providerToDelete.provider)
+      }
       const updatedProviders = currentByok.providers.filter((_, i) => i !== index)
       setAISetting("byok", {
         ...currentByok,
@@ -103,13 +114,23 @@ export const ByokSection = () => {
 
   return (
     <div className="space-y-4">
+      {!IN_ELECTRON && (
+        <div className="rounded-lg border border-yellow/30 bg-yellow/10 px-3 py-2 text-xs text-text-secondary">
+          {t("byok.web_unavailable")}
+        </div>
+      )}
+
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <Label className="text-sm font-medium text-text">{t("byok.enabled")}</Label>
             <div className="text-xs text-text-secondary">{t("byok.description")}</div>
           </div>
-          <Switch checked={byok.enabled} onCheckedChange={handleToggleEnabled} />
+          <Switch
+            checked={byok.enabled}
+            disabled={!IN_ELECTRON}
+            onCheckedChange={handleToggleEnabled}
+          />
         </div>
       </div>
 
@@ -140,7 +161,7 @@ export const ByokSection = () => {
           <div className="!mt-2 space-y-4">
             {byok.providers.map((provider, index) => (
               <ByokProviderItem
-                key={index}
+                key={provider.provider}
                 provider={provider}
                 onDelete={() => handleDeleteProvider(index)}
                 onEdit={() => handleEditProvider(index, provider)}
