@@ -23,6 +23,7 @@ describe("resolveExpoProjectConfig", () => {
       slug: "follow",
       iosBundleIdentifier: "is.follow",
       androidPackage: "is.follow",
+      googleServicesAndroidFile: "./build/google-services.json",
       useUpstreamOtaUpdates: true,
     })
   })
@@ -41,6 +42,7 @@ describe("resolveExpoProjectConfig", () => {
       slug: "folo-dev",
       iosBundleIdentifier: "is.follow.dev.yongerong",
       androidPackage: "is.follow.dev.yongerong",
+      googleServicesAndroidFile: "./build/google-services.fork.json",
       useUpstreamOtaUpdates: false,
     })
   })
@@ -59,6 +61,7 @@ describe("resolveExpoProjectConfig", () => {
       slug: "folo-dev",
       iosBundleIdentifier: "is.follow.dev.yongerong",
       androidPackage: "is.follow.dev.yongerong",
+      googleServicesAndroidFile: "./build/google-services.fork.json",
       useUpstreamOtaUpdates: false,
     })
   })

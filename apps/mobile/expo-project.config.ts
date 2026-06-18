@@ -6,6 +6,7 @@ export type ExpoProjectConfig = {
   slug: string
   iosBundleIdentifier: string
   androidPackage: string
+  googleServicesAndroidFile: string
   useUpstreamOtaUpdates: boolean
 }
 
@@ -29,6 +30,10 @@ export const resolveExpoProjectConfig = (): ExpoProjectConfig => {
   const slug = process.env.EXPO_SLUG ?? "follow"
   const iosBundleIdentifier = process.env.IOS_BUNDLE_IDENTIFIER ?? "is.follow"
   const androidPackage = process.env.ANDROID_PACKAGE ?? "is.follow"
+  const googleServicesAndroidFile =
+    androidPackage === "is.follow"
+      ? "./build/google-services.json"
+      : "./build/google-services.fork.json"
 
   const useUpstreamOtaUpdates =
     process.env.EXPO_UPDATES_ENABLED === "true" ||
@@ -42,6 +47,7 @@ export const resolveExpoProjectConfig = (): ExpoProjectConfig => {
     slug,
     iosBundleIdentifier,
     androidPackage,
+    googleServicesAndroidFile,
     useUpstreamOtaUpdates,
   }
 }

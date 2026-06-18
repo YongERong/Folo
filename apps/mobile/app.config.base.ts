@@ -107,7 +107,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         monochromeImage: adaptiveIconPath,
         backgroundColor: "#FF5C00",
       },
-      googleServicesFile: "./build/google-services.json",
+      googleServicesFile: expoProject.googleServicesAndroidFile,
     },
     // web: {
     //   bundler: "metro",

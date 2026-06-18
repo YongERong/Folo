@@ -49,3 +49,5 @@ Podfile.lock
 buildServer.json
 
 .env.local
+build.apk
+build/google-services.fork.json
