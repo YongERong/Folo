@@ -1,6 +1,8 @@
 import type { ConfigContext, ExpoConfig } from "expo/config"
 import { resolve } from "pathe"
 
+import { resolveExpoProjectConfig } from "./expo-project.config"
+
 const PKG = require("./package.json") as typeof import("./package.json")
 
 // const roundedIconPath = resolve(__dirname, "../../resources/icon.png")
@@ -53,6 +55,7 @@ export const resolveRuntimeVersion = ({
 }
 
 export default ({ config }: ConfigContext): ExpoConfig => {
+  const expoProject = resolveExpoProjectConfig()
   const profile = process.env.PROFILE || "production"
   const channelName = channelNameMap[profile] || channelNameMap.production
   const runtimeVersion = resolveRuntimeVersion({
@@ -66,28 +69,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
     extra: {
       eas: {
-        projectId: "a6335b14-fb84-45aa-ba80-6f6ab8926920",
+        projectId: expoProject.projectId,
       },
       e2eEnvProfile: process.env.EXPO_PUBLIC_E2E_ENV_PROFILE ?? null,
       e2eLanguage: process.env.EXPO_PUBLIC_E2E_LANGUAGE ?? null,
     },
-    owner: "follow",
-    updates: {
-      url: "https://ota.folo.is/manifest",
-      requestHeaders: {
-        "expo-channel-name": channelName,
-      },
-      codeSigningCertificate: "./code-signing/certificate.pem",
-      codeSigningMetadata: {
-        keyid: "main",
-        alg: "rsa-v1_5-sha256",
-      },
-      checkAutomatically: "NEVER",
-    },
+    owner: expoProject.owner,
     runtimeVersion,
 
     name: "Folo",
-    slug: "follow",
+    slug: expoProject.slug,
     version: PKG.version,
     orientation: "portrait" as const,
     icon: iconPath,
@@ -95,7 +86,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     userInterfaceStyle: "automatic" as const,
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "is.follow",
+      bundleIdentifier: expoProject.iosBundleIdentifier,
       usesAppleSignIn: true,
       infoPlist: {
         LSApplicationCategoryType: "public.app-category.news",
@@ -110,7 +101,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       googleServicesFile: "./build/GoogleService-Info.plist",
     },
     android: {
-      package: "is.follow",
+      package: expoProject.androidPackage,
       adaptiveIcon: {
         foregroundImage: adaptiveIconPath,
         monochromeImage: adaptiveIconPath,
@@ -200,6 +191,21 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ],
       "expo-background-task",
     ],
+  }
+
+  if (expoProject.useUpstreamOtaUpdates) {
+    result.updates = {
+      url: "https://ota.folo.is/manifest",
+      requestHeaders: {
+        "expo-channel-name": channelName,
+      },
+      codeSigningCertificate: "./code-signing/certificate.pem",
+      codeSigningMetadata: {
+        keyid: "main",
+        alg: "rsa-v1_5-sha256",
+      },
+      checkAutomatically: "NEVER",
+    }
   }
 
   if (process.env.PROFILE !== "production") {

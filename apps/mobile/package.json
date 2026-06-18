@@ -17,7 +17,7 @@
     "eas-build-pre-install": "command -v pod >/dev/null 2>&1 && pod repo update || echo 'CocoaPods not found, skipping pod repo update'",
     "ios": "expo run:ios",
     "ios:device": "expo run:ios --device",
-    "start": "expo start --dev-client",
+    "setup:eas-fork": "node ./scripts/setup-eas-fork.mjs",
     "start:clean": "expo start --dev-client --clear",
     "typecheck": "tsc --noEmit",
     "update": "tsx scripts/expo-update.ts",
