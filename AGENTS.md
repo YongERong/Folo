@@ -178,3 +178,18 @@ These classes map to the UIKit color variables (see `.cursor rules/color` and `a
 - Authenticated features (feed search, discover/trending content, subscriptions) require logging into the production backend via magic-link email or an existing account. Cloud agents without credentials can still verify the app fully renders and that the email login form validates input; deeper end-to-end flows need real credentials.
 - `pnpm install` warns about ignored build scripts (`better-sqlite3`, `unrs-resolver`, `workerd`). These are not needed for the web renderer (browser uses OPFS SQLite) and the warning is safe to ignore for web dev.
 - Standard quality gates are `pnpm typecheck`, `pnpm lint`, `pnpm test` (see "Quality gates" above). Tests use Vitest; the renderer suite is the largest.
+
+### Desktop Electron app (macOS/Windows/Linux builds share this codebase)
+
+- Run with `cd apps/desktop && pnpm run dev:electron` (electron-vite; renderer dev server on `:5173`). No `.env` needed — same production-API defaults as the web app.
+- The VM has a display at `DISPLAY=:1`. Electron's default GPU path fails here ("Exiting GPU process due to errors during initialization") and renders a blank window. Launch with SwiftShader to make the window paint: `DISPLAY=:1 pnpm run dev:electron -- --no-sandbox --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`. (`--disable-gpu`/llvmpipe alone is NOT enough — it still paints blank; SwiftShader/ANGLE is what works.)
+- `electron-vite dev` keeps the Electron main process alive and respawns it; to fully stop it, kill the `electron-vite dev` process (Ctrl-C in its terminal), not just the Electron PID.
+- Harmless container noise in logs: `Failed to connect to the bus` (no dbus), `org.freedesktop.UPower` (no UPower). `401 Unauthorized` responses are expected when not logged in.
+- True macOS `.app`/`.dmg` packaging (`build:electron-forge:macos`/`:mas`) requires macOS and cannot be produced on this Linux VM.
+
+### Mobile app (React Native + Expo)
+
+- This is a native iOS/Android app; full device runs (`expo run:ios` / `expo run:android`) require Xcode (macOS) or the Android SDK, neither of which is available on this Linux VM.
+- Create `apps/mobile/.env` (gitignored) with `EXPO_PUBLIC_APP_CHECK_DEBUG_TOKEN="<any-string>"` before starting Expo (per CONTRIBUTING.md).
+- To verify the JS app bundles for its real target without native toolchains: `cd apps/mobile && pnpm exec expo export -p ios --output-dir /tmp/folo-ios-export` (produces a Hermes `.hbc` bundle). `pnpm --filter @follow/mobile typecheck` also passes.
+- `expo start --web` does NOT fully work: `react-native-track-player`'s web shim imports the optional `shaka-player` peer dep which isn't installed, so the web bundle fails near the end. Web is not a supported target for this app; use `expo export -p ios`/`-p android` to validate bundling instead.
