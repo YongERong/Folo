@@ -169,3 +169,12 @@ These classes map to the UIKit color variables (see `.cursor rules/color` and `a
   - [ ] `pnpm typecheck` passes
   - [ ] `pnpm lint:fix` passes cleanly
   - [ ] Tests updated and pass
+
+## Cursor Cloud specific instructions
+
+- Node 22 and pnpm 10.17.0 are preinstalled. `pnpm install` runs `postinstall` (`build:packages` via Turbo) and `prepare` (git hooks), so shared packages are built automatically after install.
+- Primary web app: run `pnpm run dev:web` from the repo root. Vite serves the renderer at `http://localhost:2233` and also starts the SSR preview at `http://localhost:2234`. No local backend is needed — the client points at the production API (`https://api.folo.is`) by default, so feeds/auth work against production.
+- No `.env` is required to run the web app; all `VITE_*` vars have production defaults (`apps/desktop/.env.example` shows `localhost` values only for developers who run the private backend, which is NOT in this repo).
+- Authenticated features (feed search, discover/trending content, subscriptions) require logging into the production backend via magic-link email or an existing account. Cloud agents without credentials can still verify the app fully renders and that the email login form validates input; deeper end-to-end flows need real credentials.
+- `pnpm install` warns about ignored build scripts (`better-sqlite3`, `unrs-resolver`, `workerd`). These are not needed for the web renderer (browser uses OPFS SQLite) and the warning is safe to ignore for web dev.
+- Standard quality gates are `pnpm typecheck`, `pnpm lint`, `pnpm test` (see "Quality gates" above). Tests use Vitest; the renderer suite is the largest.
