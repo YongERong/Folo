@@ -69,7 +69,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
     extra: {
       eas: {
-        projectId: expoProject.projectId,
+        ...(expoProject.projectId ? { projectId: expoProject.projectId } : {}),
       },
       e2eEnvProfile: process.env.EXPO_PUBLIC_E2E_ENV_PROFILE ?? null,
       e2eLanguage: process.env.EXPO_PUBLIC_E2E_LANGUAGE ?? null,

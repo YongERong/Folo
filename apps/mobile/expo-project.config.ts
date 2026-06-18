@@ -2,16 +2,30 @@ const UPSTREAM_EAS_PROJECT_ID = "a6335b14-fb84-45aa-ba80-6f6ab8926920"
 
 export type ExpoProjectConfig = {
   owner: string
-  projectId: string
+  projectId: string | undefined
   slug: string
   iosBundleIdentifier: string
   androidPackage: string
   useUpstreamOtaUpdates: boolean
 }
 
+const resolveProjectId = (owner: string) => {
+  const configuredProjectId = process.env.EAS_PROJECT_ID?.trim()
+
+  if (configuredProjectId) {
+    return configuredProjectId
+  }
+
+  if (owner === "follow") {
+    return UPSTREAM_EAS_PROJECT_ID
+  }
+
+  return
+}
+
 export const resolveExpoProjectConfig = (): ExpoProjectConfig => {
   const owner = process.env.EXPO_OWNER ?? "follow"
-  const projectId = process.env.EAS_PROJECT_ID ?? UPSTREAM_EAS_PROJECT_ID
+  const projectId = resolveProjectId(owner)
   const slug = process.env.EXPO_SLUG ?? "follow"
   const iosBundleIdentifier = process.env.IOS_BUNDLE_IDENTIFIER ?? "is.follow"
   const androidPackage = process.env.ANDROID_PACKAGE ?? "is.follow"

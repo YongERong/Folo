@@ -27,6 +27,24 @@ describe("resolveExpoProjectConfig", () => {
     })
   })
 
+  it("leaves projectId unset for fork owners without EAS_PROJECT_ID", () => {
+    process.env.EXPO_OWNER = "yongerong"
+    delete process.env.EAS_PROJECT_ID
+    process.env.EXPO_SLUG = "folo-dev"
+    process.env.IOS_BUNDLE_IDENTIFIER = "is.follow.dev.yongerong"
+    process.env.ANDROID_PACKAGE = "is.follow.dev.yongerong"
+    process.env.EXPO_UPDATES_ENABLED = "false"
+
+    expect(resolveExpoProjectConfig()).toEqual({
+      owner: "yongerong",
+      projectId: undefined,
+      slug: "folo-dev",
+      iosBundleIdentifier: "is.follow.dev.yongerong",
+      androidPackage: "is.follow.dev.yongerong",
+      useUpstreamOtaUpdates: false,
+    })
+  })
+
   it("disables upstream OTA updates for fork projects", () => {
     process.env.EXPO_OWNER = "yongerong"
     process.env.EAS_PROJECT_ID = "11111111-1111-1111-1111-111111111111"

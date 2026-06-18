@@ -56,7 +56,7 @@ const upsertEnvValue = (contents, key, value) => {
   return trimmed.length > 0 ? `${trimmed}\n${line}\n` : `${line}\n`
 }
 
-const runEas = (args, env) => {
+const runEas = (args, env, { allowFailure = false } = {}) => {
   const result = spawnSync("pnpm", ["dlx", "eas-cli@16.26.0", ...args], {
     cwd: mobileDir,
     env,
@@ -64,30 +64,55 @@ const runEas = (args, env) => {
     stdio: ["ignore", "pipe", "pipe"],
   })
 
-  if (result.status !== 0) {
-    const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim()
-    throw new Error(output || `eas ${args.join(" ")} failed`)
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`
+
+  if (result.status !== 0 && !allowFailure) {
+    throw new Error(output.trim() || `eas ${args.join(" ")} failed`)
   }
 
-  return `${result.stdout ?? ""}${result.stderr ?? ""}`
+  return {
+    ok: result.status === 0,
+    output,
+    exitCode: result.status ?? 1,
+  }
+}
+
+const extractProjectIdFromOutput = (output) => {
+  const patterns = [
+    /"projectId":\s*"([0-9a-f-]{36})"/i,
+    /\bID\s+([0-9a-f-]{36})\b/i,
+    /projects\/[0-9a-f-]{36}/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = output.match(pattern)
+    if (match?.[1]) {
+      return match[1]
+    }
+  }
+
+  return
 }
 
 const resolveExpoUsername = (whoamiOutput) => {
-  const match = whoamiOutput.match(/^Logged in as ([^\n]+)$/m)
-  if (!match?.[1]) {
-    throw new Error(`Could not parse Expo username from:\n${whoamiOutput}`)
+  const lines = whoamiOutput
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("★") && !line.startsWith("To upgrade"))
+
+  for (const line of lines) {
+    const loggedInMatch = line.match(/^Logged in as (.+)$/i)
+    if (loggedInMatch?.[1]) {
+      return loggedInMatch[1].trim()
+    }
+
+    const authenticatedMatch = line.match(/^([^\s(]+)\s+\(authenticated using /i)
+    if (authenticatedMatch?.[1]) {
+      return authenticatedMatch[1].trim()
+    }
   }
 
-  return match[1].trim()
-}
-
-const resolveProjectId = (projectInfoOutput) => {
-  const match = projectInfoOutput.match(/ID\s+([0-9a-f-]{36})/i)
-  if (!match?.[1]) {
-    throw new Error(`Could not parse EAS project ID from:\n${projectInfoOutput}`)
-  }
-
-  return match[1]
+  throw new Error(`Could not parse Expo username from:\n${whoamiOutput}`)
 }
 
 const main = () => {
@@ -111,10 +136,10 @@ const main = () => {
   }
 
   console.info("Checking Expo login...")
-  const whoamiOutput = runEas(["whoami"], childEnv)
-  process.stdout.write(whoamiOutput)
+  const whoamiResult = runEas(["whoami"], childEnv)
+  process.stdout.write(whoamiResult.output)
 
-  const expoOwner = fileEnv.EXPO_OWNER || resolveExpoUsername(whoamiOutput)
+  const expoOwner = fileEnv.EXPO_OWNER || resolveExpoUsername(whoamiResult.output)
   const expoSlug = fileEnv.EXPO_SLUG || "folo-dev"
   const iosBundleIdentifier =
     fileEnv.IOS_BUNDLE_IDENTIFIER ||
@@ -134,17 +159,39 @@ const main = () => {
     IOS_BUNDLE_IDENTIFIER: iosBundleIdentifier,
     ANDROID_PACKAGE: androidPackage,
     EXPO_UPDATES_ENABLED: "false",
+    EAS_PROJECT_ID: "",
   }
 
   console.info("\nCreating/linking EAS project...")
-  const initOutput = runEas(["init", "--non-interactive", "--force"], initEnv)
-  process.stdout.write(initOutput)
+  const initResult = runEas(["init", "--non-interactive", "--force"], initEnv, {
+    allowFailure: true,
+  })
+  process.stdout.write(initResult.output)
+
+  let projectId = fileEnv.EAS_PROJECT_ID || extractProjectIdFromOutput(initResult.output)
+
+  if (!projectId) {
+    if (!initResult.ok && !initResult.output.includes("Created @")) {
+      throw new Error(initResult.output.trim() || "eas init failed before creating a project")
+    }
+
+    throw new Error(
+      `EAS project appears to have been created, but no project ID was found in init output:\n${initResult.output}`,
+    )
+  }
+
+  const linkedEnv = {
+    ...initEnv,
+    EAS_PROJECT_ID: projectId,
+  }
 
   console.info("\nReading linked project info...")
-  const projectInfoOutput = runEas(["project:info"], initEnv)
-  process.stdout.write(projectInfoOutput)
+  const projectInfoResult = runEas(["project:info"], linkedEnv, { allowFailure: true })
+  process.stdout.write(projectInfoResult.output)
 
-  const projectId = fileEnv.EAS_PROJECT_ID || resolveProjectId(projectInfoOutput)
+  if (!fileEnv.EAS_PROJECT_ID && projectInfoResult.ok) {
+    projectId = extractProjectIdFromOutput(projectInfoResult.output) ?? projectId
+  }
 
   let envContents = existsSync(envPath) ? readFileSync(envPath, "utf8") : ""
   envContents = upsertEnvValue(envContents, "EXPO_TOKEN", expoToken)
