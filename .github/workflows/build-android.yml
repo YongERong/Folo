@@ -39,6 +39,8 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: 🧹 Claim disk space
         run: |
