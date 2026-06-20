@@ -2,9 +2,9 @@ import { useViewWithSubscription } from "@follow/store/subscription/hooks"
 import { useUnreadByView } from "@follow/store/unread/hooks"
 import { cn } from "@follow/utils"
 import * as React from "react"
-import { useEffect } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import type { StyleProp, ViewStyle } from "react-native"
+import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native"
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native"
 import Animated, { interpolate, interpolateColor, useAnimatedStyle } from "react-native-reanimated"
 
@@ -12,6 +12,7 @@ import { ReAnimatedPressable } from "@/src/components/common/AnimatedComponents"
 import { TIMELINE_VIEW_SELECTOR_HEIGHT } from "@/src/constants/ui"
 import type { ViewDefinition } from "@/src/constants/views"
 import { views } from "@/src/constants/views"
+import { isAndroid } from "@/src/lib/platform"
 import { useIsTabletLayout, useReadableContainerStyle } from "@/src/lib/responsive"
 import {
   selectTimeline,
@@ -21,23 +22,136 @@ import {
 import { useColor } from "@/src/theme/colors"
 
 import { UnreadCount } from "../subscription/items/UnreadCount"
+import {
+  getResolvedActiveWidth,
+  getScrollOffsetToRevealTab,
+  getTimelineViewRowWidth,
+  shouldTimelineViewSelectorScroll,
+  TIMELINE_VIEW_SELECTOR_ACTIVE_TEXT_WIDTH,
+  TIMELINE_VIEW_SELECTOR_GAP,
+  TIMELINE_VIEW_SELECTOR_INACTIVE_WIDTH,
+} from "./timeline-view-selector-layout"
 import { TimelineViewSelectorContextMenu } from "./TimelineViewSelectorContextMenu"
 
-const ACTIVE_WIDTH = 180
-const INACTIVE_WIDTH = 48
-const ACTIVE_TEXT_WIDTH = 100
-const MAX_TABLET_ACTIVE_WIDTH = 280
 const styles = StyleSheet.create({
   scrollView: {
     width: "100%",
   },
 })
+
+type ItemLayout = {
+  x: number
+  width: number
+}
+
 export function TimelineViewSelector() {
   const activeViews = useViewWithSubscription()
-  const scrollViewRef = React.useRef<ScrollView | null>(null)
+  const scrollViewRef = useRef<ScrollView | null>(null)
+  const scrollXRef = useRef(0)
   const selectedFeed = useSelectedFeed()
   const readableContainerStyle = useReadableContainerStyle(760, 12)
+  const { width: windowWidth } = useWindowDimensions()
+  const isTablet = useIsTabletLayout()
+  const [viewportWidth, setViewportWidth] = useState(windowWidth)
+  const [itemLayouts, setItemLayouts] = useState<Record<number, ItemLayout>>({})
+
   const activeViewCount = activeViews.length
+  const resolvedViewportWidth = viewportWidth || windowWidth
+  const resolvedActiveWidth = getResolvedActiveWidth({
+    windowWidth: resolvedViewportWidth,
+    viewCount: activeViewCount,
+    isTablet,
+  })
+  const rowWidth = getTimelineViewRowWidth({
+    activeWidth: resolvedActiveWidth,
+    viewCount: activeViewCount,
+  })
+  const shouldScroll = shouldTimelineViewSelectorScroll({
+    rowWidth,
+    viewportWidth: resolvedViewportWidth,
+    viewCount: activeViewCount,
+  })
+
+  const activeIndex = useMemo(() => {
+    if (selectedFeed?.type !== "view") {
+      return -1
+    }
+
+    return activeViews.indexOf(selectedFeed.viewId)
+  }, [activeViews, selectedFeed])
+
+  const handleItemLayout = useCallback((index: number, layout: ItemLayout) => {
+    setItemLayouts((previousLayouts) => {
+      const previousLayout = previousLayouts[index]
+      if (
+        previousLayout &&
+        previousLayout.x === layout.x &&
+        previousLayout.width === layout.width
+      ) {
+        return previousLayouts
+      }
+
+      return {
+        ...previousLayouts,
+        [index]: layout,
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (activeIndex < 0 || !shouldScroll) {
+      return
+    }
+
+    const activeLayout = itemLayouts[activeIndex]
+    if (!activeLayout || !scrollViewRef.current) {
+      return
+    }
+
+    const timeout = setTimeout(() => {
+      const nextScrollX = getScrollOffsetToRevealTab({
+        tabX: activeLayout.x,
+        tabWidth: activeLayout.width,
+        scrollX: scrollXRef.current,
+        viewportWidth: resolvedViewportWidth,
+      })
+
+      if (nextScrollX === null) {
+        return
+      }
+
+      scrollViewRef.current?.scrollTo({
+        x: nextScrollX,
+        animated: true,
+      })
+    }, 50)
+
+    return () => {
+      clearTimeout(timeout)
+    }
+  }, [activeIndex, itemLayouts, resolvedViewportWidth, shouldScroll])
+
+  const contentContainerStyle = useMemo(() => {
+    if (activeViewCount <= 0) {
+      return
+    }
+
+    if (shouldScroll) {
+      return {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: TIMELINE_VIEW_SELECTOR_GAP,
+        paddingHorizontal: 12,
+      }
+    }
+
+    return {
+      minWidth: "100%" as const,
+      justifyContent: "center" as const,
+      gap: TIMELINE_VIEW_SELECTOR_GAP,
+    }
+  }, [activeViewCount, shouldScroll])
+
   return (
     <View
       className="flex items-center justify-between py-2"
@@ -51,16 +165,16 @@ export function TimelineViewSelector() {
           style={styles.scrollView}
           horizontal
           scrollsToTop={false}
-          contentContainerClassName="flex-row items-center px-3"
-          contentContainerStyle={
-            activeViewCount > 0
-              ? {
-                  minWidth: "100%",
-                  justifyContent: "center",
-                  gap: 12,
-                }
-              : undefined
-          }
+          nestedScrollEnabled={isAndroid}
+          scrollEventThrottle={16}
+          onLayout={(event) => {
+            setViewportWidth(event.nativeEvent.layout.width)
+          }}
+          onScroll={(event) => {
+            scrollXRef.current = event.nativeEvent.contentOffset.x
+          }}
+          contentContainerClassName={shouldScroll ? undefined : "flex-row items-center px-3"}
+          contentContainerStyle={contentContainerStyle}
           showsHorizontalScrollIndicator={false}
         >
           {activeViews.map((v, index) => {
@@ -71,8 +185,9 @@ export function TimelineViewSelector() {
                 key={view.name}
                 index={index}
                 view={view}
-                scrollViewRef={scrollViewRef}
+                resolvedActiveWidth={resolvedActiveWidth}
                 isActive={selectedFeed?.type === "view" && selectedFeed.viewId === view.view}
+                onLayout={handleItemLayout}
               />
             )
           })}
@@ -81,6 +196,7 @@ export function TimelineViewSelector() {
     </View>
   )
 }
+
 function ItemWrapper({
   index,
   activeColor,
@@ -89,6 +205,7 @@ function ItemWrapper({
   style,
   className,
   testID,
+  resolvedActiveWidth,
 }: {
   children: React.ReactNode
   index: number
@@ -98,19 +215,11 @@ function ItemWrapper({
   className?: string
   style?: Exclude<StyleProp<ViewStyle>, number>
   testID?: string
+  resolvedActiveWidth: number
 }) {
-  const { width: windowWidth } = useWindowDimensions()
-  const activeViews = useViewWithSubscription()
   const dragProgress = useTimelineSelectorDragProgress()
-  const isTablet = useIsTabletLayout()
-  const activeWidth = Math.max(
-    windowWidth - (INACTIVE_WIDTH + 12) * (activeViews.length - 1) - 8 * 2,
-    ACTIVE_WIDTH,
-  )
-  const resolvedActiveWidth = isTablet
-    ? Math.min(activeWidth, MAX_TABLET_ACTIVE_WIDTH)
-    : activeWidth
   const bgColor = useColor("gray5")
+
   return (
     <ReAnimatedPressable
       testID={testID}
@@ -128,7 +237,11 @@ function ItemWrapper({
         width: interpolate(
           dragProgress.get(),
           [index - 1, index, index + 1],
-          [INACTIVE_WIDTH, Math.max(resolvedActiveWidth, INACTIVE_WIDTH), INACTIVE_WIDTH],
+          [
+            TIMELINE_VIEW_SELECTOR_INACTIVE_WIDTH,
+            Math.max(resolvedActiveWidth, TIMELINE_VIEW_SELECTOR_INACTIVE_WIDTH),
+            TIMELINE_VIEW_SELECTOR_INACTIVE_WIDTH,
+          ],
           "clamp",
         ),
         ...style,
@@ -138,54 +251,39 @@ function ItemWrapper({
     </ReAnimatedPressable>
   )
 }
+
 function ViewItem({
   view,
   index,
-  scrollViewRef,
   isActive,
+  resolvedActiveWidth,
+  onLayout,
 }: {
   view: ViewDefinition
-  // The notification or audio view will be hidden in some cases, so we need to pass the index
   index: number
-  scrollViewRef: React.RefObject<ScrollView | null>
   isActive: boolean
+  resolvedActiveWidth: number
+  onLayout: (index: number, layout: ItemLayout) => void
 }) {
   const textColor = useColor("gray")
   const unreadCount = useUnreadByView(view.view)
   const borderColor = useColor("gray5")
   const { t } = useTranslation("common")
-  const itemRef = React.useRef<View>(null)
-  const { width: windowWidth } = useWindowDimensions()
   const dragProgress = useTimelineSelectorDragProgress()
 
-  // Scroll to center the active item when it becomes active
-  useEffect(() => {
-    let timeout: NodeJS.Timeout | null = null
-    if (isActive && scrollViewRef.current && itemRef.current) {
-      // Give time for animation to start
-      timeout = setTimeout(() => {
-        itemRef.current?.measureInWindow((x, y, width) => {
-          const scrollX = x - windowWidth / 2 + width / 2
-          scrollViewRef.current?.scrollTo({
-            x: Math.max(0, scrollX),
-            animated: true,
-          })
-        })
-      }, 50)
-    }
-    return () => {
-      if (timeout) {
-        clearTimeout(timeout)
-      }
-    }
-  }, [isActive, scrollViewRef, windowWidth])
   return (
     <TimelineViewSelectorContextMenu type="view" viewId={view.view}>
-      <View ref={itemRef}>
+      <View
+        onLayout={(event: LayoutChangeEvent) => {
+          const { x, width } = event.nativeEvent.layout
+          onLayout(index, { x, width })
+        }}
+      >
         <ItemWrapper
           isActive={isActive}
           index={index}
           activeColor={view.activeColor}
+          resolvedActiveWidth={resolvedActiveWidth}
           testID={`timeline-view-${view.name.replace("feed_view_type.", "").replaceAll("_", "-")}`}
           onPress={() =>
             selectTimeline({
@@ -218,7 +316,7 @@ function ViewItem({
               width: interpolate(
                 dragProgress.get(),
                 [index - 1, index, index + 1],
-                [0, ACTIVE_TEXT_WIDTH, 0],
+                [0, TIMELINE_VIEW_SELECTOR_ACTIVE_TEXT_WIDTH, 0],
                 "clamp",
               ),
             }))}
