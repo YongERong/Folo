@@ -39,6 +39,8 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: 🧹 Claim disk space
         run: |
@@ -91,6 +93,23 @@ jobs:
             echo "GitHub Release APKs must use the production-apk profile."
             exit 1
           fi
+
+      - name: Configure fork Expo env
+        run: |
+          for key in EXPO_OWNER EXPO_SLUG EAS_PROJECT_ID IOS_BUNDLE_IDENTIFIER ANDROID_PACKAGE EXPO_UPDATES_ENABLED; do
+            value="${{ vars.EXPO_OWNER }}"
+            case "$key" in
+              EXPO_OWNER) value="${{ vars.EXPO_OWNER }}" ;;
+              EXPO_SLUG) value="${{ vars.EXPO_SLUG }}" ;;
+              EAS_PROJECT_ID) value="${{ vars.EAS_PROJECT_ID }}" ;;
+              IOS_BUNDLE_IDENTIFIER) value="${{ vars.IOS_BUNDLE_IDENTIFIER }}" ;;
+              ANDROID_PACKAGE) value="${{ vars.ANDROID_PACKAGE }}" ;;
+              EXPO_UPDATES_ENABLED) value="${{ vars.EXPO_UPDATES_ENABLED }}" ;;
+            esac
+            if [ -n "$value" ]; then
+              echo "$key=$value" >> "$GITHUB_ENV"
+            fi
+          done
 
       - name: 🔨 Build Android app
         working-directory: apps/mobile
