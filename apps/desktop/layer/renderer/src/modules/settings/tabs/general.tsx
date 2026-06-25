@@ -27,6 +27,7 @@ import { useProxyValue, useSetProxy } from "~/hooks/biz/useProxySetting"
 import { useMinimizeToTrayValue, useSetMinimizeToTray } from "~/hooks/biz/useTraySetting"
 import { fallbackLanguage } from "~/i18n"
 import { ipcServices } from "~/lib/client"
+import { isByokActive } from "~/modules/ai-byok/routing"
 import { setTranslationCache } from "~/modules/entry-content/atoms"
 import { fetchTtsVoices } from "~/modules/player/tts-service"
 
@@ -302,7 +303,7 @@ const TranslationModeSelector = () => {
   const translationMode = useGeneralSettingKey("translationMode")
   const role = useUserRole()
   const isPaymentEnabled = useIsPaymentEnabled()
-  const disabledForRole = role === UserRole.Free && isPaymentEnabled
+  const disabledForRole = role === UserRole.Free && isPaymentEnabled && !isByokActive()
 
   return (
     <>

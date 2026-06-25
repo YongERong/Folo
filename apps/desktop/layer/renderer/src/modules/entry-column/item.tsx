@@ -1,4 +1,5 @@
 import { FeedViewType, isFreeRole } from "@follow/constants"
+import { isByokActiveInStore } from "@follow/store/context"
 import { useHasEntry } from "@follow/store/entry/hooks"
 import { useEntryTranslation, usePrefetchEntryTranslation } from "@follow/store/translation/hooks"
 import { useUserRole } from "@follow/store/user/hooks"
@@ -27,7 +28,8 @@ const EntryItemImpl = memo(function EntryItemImpl({
   const translationMode = useGeneralSettingKey("translationMode")
   const actionLanguage = useActionLanguage()
   const userRole = useUserRole()
-  const shouldPrefetchTranslation = enableTranslation && !isFreeRole(userRole)
+  const shouldPrefetchTranslation =
+    enableTranslation && (!isFreeRole(userRole) || isByokActiveInStore())
   const translation = useEntryTranslation({
     entryId,
     language: actionLanguage,

@@ -57,6 +57,10 @@ export const isByokActiveInStore = (): boolean => {
   return getByokServices()?.isActive() ?? false
 }
 
+export const canUseByokBackedAiFeatures = (): boolean => {
+  return isByokActiveInStore()
+}
+
 export const api = apiContext.consumer
 export const authClient = authClientContext.consumer
 export const queryClient = queryClientContext.consumer

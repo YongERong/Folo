@@ -73,4 +73,30 @@ describe("translationSyncService BYOK", () => {
 
     expect(result).toBeNull()
   })
+
+  test("parses bilingual JSON responses from BYOK", async () => {
+    const generateTextMock = vi.fn().mockResolvedValue(
+      JSON.stringify({
+        title: "Title\n\nTranslated title",
+        description: "Description\n\nTranslated description",
+      }),
+    )
+    provideByokServices({
+      isActive: () => true,
+      generateText: generateTextMock,
+    })
+
+    const result = await translationSyncService.generateTranslation({
+      entryId: "entry-1",
+      language: "zh-CN",
+      target: "content",
+      withContent: false,
+      mode: "bilingual",
+    })
+
+    expect(result).toMatchObject({
+      title: "Translated title",
+      description: "Translated description",
+    })
+  })
 })

@@ -19,6 +19,61 @@ import { translationFields } from "./types"
 type TranslationModel = Omit<TranslationSchema, "createdAt">
 type TranslationBatchRequest = Parameters<ReturnType<typeof api>["ai"]["translationBatch"]>[0]
 
+const stripJsonFence = (value: string) =>
+  value
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim()
+
+const extractTranslationValue = (value: string) => {
+  const parts = value.split(/\n\s*\n/)
+  if (parts.length <= 1) return value.trim()
+  return parts.at(-1)?.trim() || value.trim()
+}
+
+const parseByokTranslationResponse = (
+  response: string,
+  fields: TranslationFieldArray,
+  payload: Partial<Record<keyof TranslationModel, string>>,
+  mode: TranslationMode,
+): Partial<Record<keyof TranslationModel, string>> => {
+  const trimmed = response.trim()
+  if (!trimmed) return payload
+
+  if (mode === "translation-only") {
+    try {
+      return JSON.parse(stripJsonFence(trimmed)) as Partial<Record<keyof TranslationModel, string>>
+    } catch {
+      return payload
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(stripJsonFence(trimmed)) as Partial<
+      Record<keyof TranslationModel, string>
+    >
+    const next: Partial<Record<keyof TranslationModel, string>> = { ...payload }
+    for (const field of fields) {
+      const value = parsed[field]
+      if (typeof value === "string") {
+        next[field] = extractTranslationValue(value)
+      }
+    }
+    return next
+  } catch {
+    const next: Partial<Record<keyof TranslationModel, string>> = { ...payload }
+    for (const field of fields) {
+      const original = payload[field]
+      if (!original) continue
+      next[field] = trimmed.includes(original)
+        ? extractTranslationValue(trimmed.slice(trimmed.indexOf(original)))
+        : trimmed
+    }
+    return next
+  }
+}
+
 interface TranslationState {
   data: Record<string, Partial<Record<SupportedActionLanguage, EntryTranslation>>>
 }
@@ -313,22 +368,7 @@ class TranslationSyncService {
 
     if (!response) return null
 
-    let parsed: Partial<Record<keyof TranslationModel, string>> = payload
-    if (mode === "translation-only") {
-      try {
-        parsed = JSON.parse(response) as Partial<Record<keyof TranslationModel, string>>
-      } catch {
-        parsed = payload
-      }
-    } else {
-      for (const field of fields) {
-        const original = payload[field]
-        if (!original) continue
-        parsed[field] = response.includes(original)
-          ? response.slice(response.indexOf(original) + original.length).trim() || response
-          : response
-      }
-    }
+    const parsed = parseByokTranslationResponse(response, fields, payload, mode)
 
     const translation: TranslationModel = {
       entryId,

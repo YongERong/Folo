@@ -1,6 +1,7 @@
 import { getDebugFeatureValue, useDebugFeatureValue } from "~/atoms/debug-feature"
 import { getServerConfigs, useServerConfigs } from "~/atoms/server-configs"
 import { featureConfigMap } from "~/lib/features"
+import { isByokActive } from "~/modules/ai-byok/routing"
 
 // Define debug feature value structure
 interface DebugFeatureValue {
@@ -23,6 +24,10 @@ const checkFeatureEnabled = (
   debugFeatureValue: DebugFeatureValue,
   serverConfigs: ReturnType<typeof getServerConfigs>,
 ): boolean => {
+  if (feature === "ai" && isByokActive()) {
+    return true
+  }
+
   const override = !!debugFeatureValue.__override
 
   if (override) {

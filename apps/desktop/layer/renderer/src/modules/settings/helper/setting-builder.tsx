@@ -6,6 +6,8 @@ import type { FC, ReactNode } from "react"
 import * as React from "react"
 import { isValidElement } from "react"
 
+import { isByokActive } from "~/modules/ai-byok/routing"
+
 import { SettingActionItem, SettingDescription, SettingInput, SettingSwitch } from "../control"
 import { SettingItemGroup, SettingSectionTitle } from "../section"
 
@@ -99,6 +101,7 @@ export const createSettingBuilder =
       }
       const disabledForRole =
         role === UserRole.Free &&
+        !isByokActive() &&
         "paidLevel" in assertSetting &&
         assertSetting.paidLevel !== undefined &&
         assertSetting.paidLevel !== SettingPaidLevels.Free &&
