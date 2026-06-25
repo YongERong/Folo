@@ -24,7 +24,7 @@ vi.mock("~/modules/ai-byok/context-builder", () => ({
     modelId: "gpt-4o-mini",
   }),
   buildByokSystemPrompt: () => "system prompt",
-  convertBizMessagesToByokMessages: () => [{ role: "user", content: "hello" }],
+  convertBizMessagesToByokMessagesAsync: async () => [{ role: "user", content: "hello" }],
   resolveActiveByokModelId: () => "gpt-4o-mini",
 }))
 

@@ -6,7 +6,7 @@ import { requireIpcServices } from "~/lib/client"
 import {
   buildActiveByokProviderConfig,
   buildByokSystemPrompt,
-  convertBizMessagesToByokMessages,
+  convertBizMessagesToByokMessagesAsync,
   resolveActiveByokModelId,
 } from "~/modules/ai-byok/context-builder"
 import { listenToByokStream } from "~/modules/ai-byok/stream"
@@ -59,7 +59,7 @@ export class ByokChatTransport implements ChatTransport<BizUIMessage> {
       provider,
       modelId,
       system: buildByokSystemPrompt(this.scene),
-      messages: convertBizMessagesToByokMessages(messages),
+      messages: await convertBizMessagesToByokMessagesAsync(messages),
       personalizePrompt: undefined,
     }
 

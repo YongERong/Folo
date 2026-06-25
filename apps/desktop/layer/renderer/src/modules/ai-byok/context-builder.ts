@@ -10,6 +10,12 @@ import { getAISettings } from "~/atoms/settings/ai"
 import type { AIChatContextBlock, BizUIMessage } from "../ai-chat/store/types"
 import { isDataBlockPart } from "../ai-chat/utils/extractor"
 import { getActiveByokProvider } from "./routing"
+import {
+  buildTimelineContextPrompt,
+  hasTimelineScopeBlocks,
+  parseMentionEntryIds,
+  parseMentionFeedIds,
+} from "./timeline-context"
 
 const MAX_ENTRY_CONTENT_CHARS = 12_000
 
@@ -90,6 +96,57 @@ const extractTextFromMessage = (message: BizUIMessage): string => {
   }
 
   return segments.join("\n").trim()
+}
+
+export const buildByokContextPromptAsync = async (
+  blocks: AIChatContextBlock[],
+  userText = "",
+): Promise<string> => {
+  const enabledBlocks = blocks.filter((block) => !block.disabled)
+  const hasTimelineContext =
+    hasTimelineScopeBlocks(enabledBlocks) ||
+    parseMentionEntryIds(userText).length > 0 ||
+    parseMentionFeedIds(userText).length > 0
+
+  if (hasTimelineContext) {
+    const timelineSection = await buildTimelineContextPrompt(enabledBlocks, userText)
+    const attachmentSections = enabledBlocks
+      .map((block) => (block.type === "fileAttachment" ? resolveContextBlock(block) : null))
+      .filter((section): section is string => !!section)
+
+    return [timelineSection, ...attachmentSections].filter(Boolean).join("\n\n")
+  }
+
+  return buildByokContextPrompt(blocks)
+}
+
+export const convertBizMessagesToByokMessagesAsync = async (
+  messages: BizUIMessage[],
+): Promise<Array<{ role: "user" | "assistant" | "system"; content: string }>> => {
+  const converted: Array<{ role: "user" | "assistant" | "system"; content: string }> = []
+
+  for (const message of messages) {
+    const text = extractTextFromMessage(message)
+    const contextBlocks = message.parts.flatMap((part) => (isDataBlockPart(part) ? part.data : []))
+    const contextPrompt = await buildByokContextPromptAsync(contextBlocks, text)
+    const mergedContent = [contextPrompt, text].filter(Boolean).join("\n\n")
+
+    if (!mergedContent) continue
+
+    if (message.role === "system") {
+      converted.push({ role: "system", content: mergedContent })
+      continue
+    }
+
+    if (message.role === "assistant") {
+      converted.push({ role: "assistant", content: mergedContent })
+      continue
+    }
+
+    converted.push({ role: "user", content: mergedContent })
+  }
+
+  return converted
 }
 
 export const convertBizMessagesToByokMessages = (

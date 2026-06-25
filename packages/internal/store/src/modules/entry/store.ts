@@ -717,7 +717,7 @@ class EntrySyncServices {
       })
     }
 
-    readStream()
+    return readStream()
   }
 
   async fetchEntryReadHistory(entryId: EntryId, size: number) {

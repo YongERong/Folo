@@ -4,26 +4,52 @@ import type { BizUIMessage } from "../ai-chat/store/types"
 import {
   buildByokContextPrompt,
   buildByokSystemPrompt,
-  convertBizMessagesToByokMessages,
+  convertBizMessagesToByokMessagesAsync,
   resolveActiveByokModelId,
 } from "./context-builder"
 
-const { getAISettingsMock, getEntryMock, getFeedByIdMock } = vi.hoisted(() => ({
+const {
+  getAISettingsMock,
+  getEntryMock,
+  getFeedByIdMock,
+  getEntryIdsByFeedIdMock,
+  fetchEntriesMock,
+  fetchEntryContentByStreamMock,
+  getGeneralSettingsMock,
+} = vi.hoisted(() => ({
   getAISettingsMock: vi.fn(),
   getEntryMock: vi.fn(),
   getFeedByIdMock: vi.fn(),
+  getEntryIdsByFeedIdMock: vi.fn(),
+  fetchEntriesMock: vi.fn(),
+  fetchEntryContentByStreamMock: vi.fn(),
+  getGeneralSettingsMock: vi.fn(),
 }))
 
 vi.mock("~/atoms/settings/ai", () => ({
   getAISettings: getAISettingsMock,
 }))
 
+vi.mock("~/atoms/settings/general", () => ({
+  getGeneralSettings: getGeneralSettingsMock,
+}))
+
 vi.mock("@follow/store/entry/getter", () => ({
   getEntry: getEntryMock,
+  getEntryIdsByFeedId: getEntryIdsByFeedIdMock,
+  getEntryIdsByFeedIds: vi.fn(() => []),
+  getEntryIdsByView: vi.fn(() => []),
 }))
 
 vi.mock("@follow/store/feed/getter", () => ({
   getFeedById: getFeedByIdMock,
+}))
+
+vi.mock("@follow/store/entry/store", () => ({
+  entrySyncServices: {
+    fetchEntries: fetchEntriesMock,
+    fetchEntryContentByStream: fetchEntryContentByStreamMock,
+  },
 }))
 
 vi.mock("./routing", () => ({
@@ -40,15 +66,23 @@ describe("BYOK context builder", () => {
       personalizePrompt: "Keep answers short.",
       aiTimelinePrompt: "Summarize the timeline.",
     })
+    getGeneralSettingsMock.mockReturnValue({
+      hidePrivateSubscriptionsInTimeline: false,
+    })
     getEntryMock.mockReturnValue({
       id: "entry-1",
       title: "Sample Entry",
       content: "<p>Hello world</p>",
+      publishedAt: new Date("2026-01-01T00:00:00.000Z"),
+      read: false,
     })
     getFeedByIdMock.mockReturnValue({
       id: "feed-1",
       title: "Sample Feed",
     })
+    getEntryIdsByFeedIdMock.mockReturnValue([])
+    fetchEntriesMock.mockResolvedValue()
+    fetchEntryContentByStreamMock.mockResolvedValue()
   })
 
   test("buildByokContextPrompt resolves entry blocks into prompt text", () => {
@@ -70,7 +104,7 @@ describe("BYOK context builder", () => {
     expect(prompt).toBe("")
   })
 
-  test("convertBizMessagesToByokMessages merges context blocks with user text", () => {
+  test("convertBizMessagesToByokMessages merges context blocks with user text", async () => {
     const messages: BizUIMessage[] = [
       {
         id: "msg-1",
@@ -92,7 +126,7 @@ describe("BYOK context builder", () => {
       },
     ]
 
-    expect(convertBizMessagesToByokMessages(messages)).toEqual([
+    expect(await convertBizMessagesToByokMessagesAsync(messages)).toEqual([
       {
         role: "user",
         content: expect.stringContaining("Summarize this entry."),
@@ -100,7 +134,7 @@ describe("BYOK context builder", () => {
     ])
   })
 
-  test("convertBizMessagesToByokMessages includes only context when rich text is empty", () => {
+  test("convertBizMessagesToByokMessages includes only context when rich text is empty", async () => {
     const messages: BizUIMessage[] = [
       {
         id: "msg-1",
@@ -122,7 +156,7 @@ describe("BYOK context builder", () => {
       },
     ]
 
-    const [converted] = convertBizMessagesToByokMessages(messages)
+    const [converted] = await convertBizMessagesToByokMessagesAsync(messages)
     expect(converted?.content).toContain("Feed: Sample Feed")
     expect(converted?.content).not.toContain("Summarize")
   })
