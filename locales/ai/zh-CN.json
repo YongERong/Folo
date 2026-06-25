@@ -106,7 +106,7 @@
   "integration.mcp.services.empty.description": "连接 MCP 服务以通过外部工具、API 和数据源扩展 AI 功能。",
   "integration.mcp.services.empty.title": "未连接 MCP 服务",
   "integration.mcp.services.title": "MCP 服务",
-  "integration.security.description": "OAuth 认证令牌和 AI BYOK API 密钥使用 AES-GCM-256 加密技术安全存储，以保护您的凭据并确保数据隐私。",
+  "integration.security.description": "OAuth 认证令牌存储在您的设备上。AI BYOK API 密钥通过 Electron 本地存储在系统钥匙串中，不会发送到 Folo 服务器。",
   "integration.security.title": "安全声明",
   "integration.title": "集成",
   "memories.actions.load_more": "加载更多",

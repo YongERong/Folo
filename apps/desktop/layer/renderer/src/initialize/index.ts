@@ -9,6 +9,7 @@ import { repository } from "@pkg"
 import { enableMapSet } from "immer"
 
 import { initI18n } from "~/i18n"
+import { initializeByok, migrateLegacyByokApiKeys } from "~/modules/ai-byok/services"
 import { hydrateSessionsFromLocalDb } from "~/modules/ai-chat-session"
 import { settingSyncQueue } from "~/modules/settings/helper/sync-queue"
 import { ElectronCloseEvent, ElectronShowEvent } from "~/providers/invalidate-query-provider"
@@ -79,6 +80,11 @@ export const initializeApp = async () => {
   enableMapSet()
 
   apm("initializeSettings", initializeSettings)
+
+  await apm("initializeByok", async () => {
+    await migrateLegacyByokApiKeys()
+    await initializeByok()
+  })
 
   await apm("i18n", initI18n)
   await apm("initAnalytics", initAnalytics)

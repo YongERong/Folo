@@ -2,8 +2,9 @@ import type { SummarySchema } from "@follow/database/schemas/types"
 import { summaryService } from "@follow/database/services/summary"
 import type { SupportedActionLanguage } from "@follow/shared"
 import { toApiSupportedActionLanguage } from "@follow/shared"
+import { buildByokSummaryPrompt } from "@follow/shared/ai/prompts"
 
-import { api } from "../../context"
+import { api, getByokServices, isByokActiveInStore } from "../../context"
 import type { Hydratable, Resetable } from "../../lib/base"
 import { createImmerSetter, createTransaction, createZustandStore } from "../../lib/helper"
 import { getEntry } from "../entry/getter"
@@ -169,16 +170,38 @@ class SummarySyncService {
       state.generatingStatus[statusID] = SummaryGeneratingStatus.Pending
     })
 
-    // Use Our AI to generate summary
-    const pendingPromise = api()
-      .ai.summary({
+    const generateWithByok = async (): Promise<string | null> => {
+      const byok = getByokServices()
+      if (!byok?.isActive()) {
+        return null
+      }
+
+      const sourceContent = entry[target] || entry.content || entry.description || entry.title
+      if (!sourceContent) return null
+
+      const plainText = sourceContent
+        .replaceAll(/<[^>]+>/g, " ")
+        .replaceAll(/\s+/g, " ")
+        .trim()
+      const generatedSummary = await byok.generateText({
+        prompt: buildByokSummaryPrompt(plainText, actionLanguage),
+      })
+
+      return generatedSummary?.trim() ? generatedSummary.trim() : null
+    }
+
+    const generateWithServer = async (): Promise<string | null> => {
+      const summary = await api().ai.summary({
         id: entryId,
         language: toApiSupportedActionLanguage(actionLanguage),
         target,
       })
-      .then((summary) => {
-        const generatedSummary = summary.data?.trim() ? summary.data : null
 
+      return summary.data?.trim() ? summary.data : null
+    }
+
+    const pendingPromise = (isByokActiveInStore() ? generateWithByok() : generateWithServer())
+      .then((generatedSummary) => {
         if (!generatedSummary) {
           immerSet((state) => {
             state.generatingStatus[statusID] = SummaryGeneratingStatus.Success

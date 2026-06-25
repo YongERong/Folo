@@ -79,7 +79,13 @@ const parseModelString = (modelString: string) => {
 
 export const AIModelIndicator = memo(({ className, onModelChange }: AIModelIndicatorProps) => {
   const { data, changeModel } = useAIModel()
-  const { defaultModel, availableModels = [], currentModel, availableModelsMenu = [] } = data || {}
+  const {
+    defaultModel,
+    availableModels = [],
+    currentModel,
+    availableModelsMenu = [],
+    isByok,
+  } = data || {}
   const role = useUserRole()
   const settingModalPresent = useSettingModal()
 
@@ -112,7 +118,7 @@ export const AIModelIndicator = memo(({ className, onModelChange }: AIModelIndic
     >
       <i className={cn("size-3", iconClass)} />
       <span className="hidden max-w-20 truncate @md:inline">
-        {selectedMenuItem?.label || modelName}
+        {isByok ? "BYOK" : selectedMenuItem?.label || modelName}
       </span>
       {hasMultipleModels && <i className="i-mingcute-down-line size-3 opacity-60" />}
     </div>

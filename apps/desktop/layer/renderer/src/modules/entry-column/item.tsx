@@ -1,4 +1,4 @@
-import { FeedViewType, isFreeRole } from "@follow/constants"
+import { FeedViewType } from "@follow/constants"
 import { useHasEntry } from "@follow/store/entry/hooks"
 import { useEntryTranslation, usePrefetchEntryTranslation } from "@follow/store/translation/hooks"
 import { useUserRole } from "@follow/store/user/hooks"
@@ -6,6 +6,7 @@ import type { FC } from "react"
 import { memo } from "react"
 
 import { useActionLanguage, useGeneralSettingKey } from "~/atoms/settings/general"
+import { canUseAiTranslationForRole } from "~/modules/ai-byok/capabilities"
 
 import { getItemComponentByView } from "./Items/getItemComponentByView"
 import { EntryItemWrapper } from "./layouts/EntryItemWrapper"
@@ -27,7 +28,7 @@ const EntryItemImpl = memo(function EntryItemImpl({
   const translationMode = useGeneralSettingKey("translationMode")
   const actionLanguage = useActionLanguage()
   const userRole = useUserRole()
-  const shouldPrefetchTranslation = enableTranslation && !isFreeRole(userRole)
+  const shouldPrefetchTranslation = enableTranslation && canUseAiTranslationForRole(userRole)
   const translation = useEntryTranslation({
     entryId,
     language: actionLanguage,

@@ -25,9 +25,11 @@ import { useGeneralSettingKey } from "~/atoms/settings/general"
 import { ROUTE_FEED_PENDING } from "~/constants/app"
 import { useFeature } from "~/hooks/biz/useFeature"
 import { useRouteParams } from "~/hooks/biz/useRouteParams"
+import { isByokActive } from "~/modules/ai-byok/routing"
 
 import { aiTimelineEnabledAtom } from "../atoms/ai-timeline"
 import { getVisibleLocalEntryIds } from "./filter-local-entry-ids"
+import { useByokAiSortedEntryIds } from "./useByokAiSortedEntryIds"
 import { useIsPreviewFeed } from "./useIsPreviewFeed"
 
 const useRemoteEntries = (): UseEntriesReturn => {
@@ -40,6 +42,9 @@ const useRemoteEntries = (): UseEntriesReturn => {
   )
   const aiTimelineEnabled = useAtomValue(aiTimelineEnabledAtom)
   const aiEnabled = useFeature("ai")
+  const byokActive = isByokActive()
+  const useServerAiSort = aiTimelineEnabled && aiEnabled && !byokActive
+  const useByokAiSort = aiTimelineEnabled && byokActive
 
   const folderIds = useFolderFeedsByFeedId({
     feedId,
@@ -56,8 +61,8 @@ const useRemoteEntries = (): UseEntriesReturn => {
       ...(hidePrivateSubscriptionsInTimeline === true && {
         hidePrivateSubscriptionsInTimeline: true,
       }),
-      ...(view === FeedViewType.All && { limit: 40 }),
-      ...(aiTimelineEnabled && aiEnabled && { aiSort: true }),
+      ...(useByokAiSort ? { limit: 100 } : view === FeedViewType.All ? { limit: 40 } : {}),
+      ...(useServerAiSort && { aiSort: true }),
     }
 
     if (feedId && listId && isBizId(feedId)) {
@@ -76,37 +81,57 @@ const useRemoteEntries = (): UseEntriesReturn => {
     hidePrivateSubscriptionsInTimeline,
     aiTimelineEnabled,
     aiEnabled,
+    byokActive,
+    useServerAiSort,
+    useByokAiSort,
   ])
   const query = useEntriesQuery(entriesOptions)
 
+  const { entryIds: sortedEntryIds, isSorting: isByokAiSorting } = useByokAiSortedEntryIds({
+    entryIds: query.entriesIds,
+    enabled: useByokAiSort && query.isSuccess,
+    queryKey: query.queryKey,
+  })
+
+  const remoteQuery = useMemo(
+    () => ({
+      ...query,
+      entriesIds: useByokAiSort ? sortedEntryIds : query.entriesIds,
+      isLoading:
+        query.isLoading || (useByokAiSort && isByokAiSorting && query.entriesIds.length > 1),
+      isFetching: query.isFetching || (useByokAiSort && isByokAiSorting),
+    }),
+    [isByokAiSorting, query, sortedEntryIds, useByokAiSort],
+  )
+
   const [fetchedTime, setFetchedTime] = useState<number>()
   useEffect(() => {
-    if (!query.isFetching) {
+    if (!remoteQuery.isFetching) {
       setFetchedTime(Date.now())
     }
-  }, [query.isFetching])
+  }, [remoteQuery.isFetching])
 
-  const refetch = useCallback(async () => void query.refetch(), [query])
-  const fetchNextPage = useCallback(async () => void query.fetchNextPage(), [query])
+  const refetch = useCallback(async () => void remoteQuery.refetch(), [remoteQuery])
+  const fetchNextPage = useCallback(async () => void remoteQuery.fetchNextPage(), [remoteQuery])
 
-  if (!query.data || query.isLoading) {
+  if (!remoteQuery.data || remoteQuery.isLoading) {
     return fallbackReturn
   }
   return {
-    entriesIds: query.entriesIds,
-    hasNext: query.hasNextPage,
+    entriesIds: remoteQuery.entriesIds,
+    hasNext: remoteQuery.hasNextPage,
     refetch,
 
     fetchNextPage,
-    isLoading: query.isFetching,
-    isRefetching: query.isRefetching,
-    isReady: query.isSuccess,
-    isFetchingNextPage: query.isFetchingNextPage,
-    isFetching: query.isFetching,
-    hasNextPage: query.hasNextPage,
-    error: query.isError ? query.error : null,
+    isLoading: remoteQuery.isFetching,
+    isRefetching: remoteQuery.isRefetching,
+    isReady: remoteQuery.isSuccess,
+    isFetchingNextPage: remoteQuery.isFetchingNextPage,
+    isFetching: remoteQuery.isFetching,
+    hasNextPage: remoteQuery.hasNextPage,
+    error: remoteQuery.isError ? remoteQuery.error : null,
     fetchedTime,
-    queryKey: query.queryKey,
+    queryKey: remoteQuery.queryKey,
   }
 }
 

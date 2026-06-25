@@ -1,4 +1,8 @@
+import { DEFAULT_BYOK_MODEL_IDS, resolveByokModelId } from "@follow/shared/ai/byok"
 import { useEffect, useMemo } from "react"
+
+import { setAISetting, useAISettingValue } from "~/atoms/settings/ai"
+import { getActiveByokProvider, isByokActive } from "~/modules/ai-byok/routing"
 
 import { setAIModelState, useAIModelState } from "../atoms/session"
 import { useAIConfiguration } from "./useAIConfiguration"
@@ -6,38 +10,56 @@ import { useAIConfiguration } from "./useAIConfiguration"
 export const useAIModel = () => {
   const { data: configuration, isLoading } = useAIConfiguration()
   const modelState = useAIModelState()
+  const aiSettings = useAISettingValue()
+  const byokActive = isByokActive()
 
-  // Validate and sync persistent model with available models
   useEffect(() => {
-    if (!configuration || isLoading) return
+    if (byokActive || !configuration || isLoading) return
 
     const { selectedModel } = modelState
     const { defaultModel, availableModels = [] } = configuration
 
-    // If no model is selected or selected model is not available, use default
     if (!selectedModel || !availableModels.includes(selectedModel)) {
       setAIModelState({
         selectedModel: defaultModel || null,
       })
     }
-  }, [configuration, isLoading, modelState])
+  }, [byokActive, configuration, isLoading, modelState])
 
-  // Get current effective model
   const currentModel = useMemo(() => {
+    if (byokActive) {
+      const provider = getActiveByokProvider()
+      if (!provider) return null
+      return resolveByokModelId(provider.provider, provider.modelId)
+    }
+
     if (!configuration) return null
 
     const { selectedModel } = modelState
     const { defaultModel, availableModels = [] } = configuration
 
-    // Return selected model if valid, otherwise fallback to default
     if (selectedModel && availableModels.includes(selectedModel)) {
       return selectedModel
     }
 
     return defaultModel || null
-  }, [configuration, modelState])
+  }, [byokActive, configuration, modelState, aiSettings.byok])
 
   const changeModel = (model: string) => {
+    if (byokActive) {
+      const provider = getActiveByokProvider()
+      if (!provider) return
+
+      const byok = aiSettings.byok ?? { enabled: false, providers: [] }
+      setAISetting("byok", {
+        ...byok,
+        providers: byok.providers.map((item) =>
+          item.provider === provider.provider ? { ...item, modelId: model } : item,
+        ),
+      })
+      return
+    }
+
     if (!configuration?.availableModels?.includes(model)) {
       console.warn(`Model ${model} is not available in current configuration`)
       return
@@ -48,14 +70,33 @@ export const useAIModel = () => {
     })
   }
 
+  const byokProvider = getActiveByokProvider()
+
   return {
     data: {
-      defaultModel: configuration?.defaultModel,
-      availableModels: configuration?.availableModels,
-      availableModelsMenu: configuration?.availableModelsMenu,
+      defaultModel: byokActive
+        ? resolveByokModelId(byokProvider?.provider ?? "openai", byokProvider?.modelId)
+        : configuration?.defaultModel,
+      availableModels: byokActive
+        ? byokProvider
+          ? [resolveByokModelId(byokProvider.provider, byokProvider.modelId)]
+          : []
+        : configuration?.availableModels,
+      availableModelsMenu: byokActive
+        ? byokProvider
+          ? [
+              {
+                label: resolveByokModelId(byokProvider.provider, byokProvider.modelId),
+                value: resolveByokModelId(byokProvider.provider, byokProvider.modelId),
+              },
+            ]
+          : []
+        : configuration?.availableModelsMenu,
       currentModel,
+      isByok: byokActive,
+      byokDefaultModel: byokProvider ? DEFAULT_BYOK_MODEL_IDS[byokProvider.provider] : undefined,
     },
-    isLoading,
+    isLoading: byokActive ? false : isLoading,
     changeModel,
   }
 }

@@ -283,6 +283,7 @@ export class ChatSliceActions {
         messages: [],
         transport: createChatTransport({
           titleHandler: this.createTransportTitleHandler(newChatId),
+          getScene: () => this.get().scene,
         }),
       },
       this.set,
@@ -325,6 +326,7 @@ export class ChatSliceActions {
           messages,
           transport: createChatTransport({
             titleHandler: this.createTransportTitleHandler(chatId),
+            getScene: () => this.get().scene,
           }),
         },
         this.set,

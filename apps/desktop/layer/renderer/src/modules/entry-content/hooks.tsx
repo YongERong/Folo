@@ -1,4 +1,3 @@
-import { isFreeRole } from "@follow/constants"
 import { useEntry, usePrefetchEntryDetail } from "@follow/store/entry/hooks"
 import { useEntryTranslation, usePrefetchEntryTranslation } from "@follow/store/translation/hooks"
 import { useUserRole } from "@follow/store/user/hooks"
@@ -11,6 +10,7 @@ import { useShowAITranslation } from "~/atoms/ai-translation"
 import { useEntryIsInReadability, useEntryIsInReadabilitySuccess } from "~/atoms/readability"
 import { useActionLanguage, useGeneralSettingKey } from "~/atoms/settings/general"
 import { useModalStack } from "~/components/ui/modal/stacked/hooks"
+import { canUseAiTranslationForRole } from "~/modules/ai-byok/capabilities"
 
 import { ImageGalleryContent } from "./components/ImageGalleryContent"
 
@@ -50,7 +50,7 @@ export const useEntryContent = (entryId: string) => {
 
   const enableTranslation = useShowAITranslation()
   const userRole = useUserRole()
-  const shouldPrefetchTranslation = enableTranslation && !isFreeRole(userRole)
+  const shouldPrefetchTranslation = enableTranslation && canUseAiTranslationForRole(userRole)
   const actionLanguage = useActionLanguage()
   const translationMode = useGeneralSettingKey("translationMode")
   const contentTranslated = useEntryTranslation({

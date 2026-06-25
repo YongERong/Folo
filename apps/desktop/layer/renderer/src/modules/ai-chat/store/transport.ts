@@ -1,9 +1,12 @@
 import { env } from "@follow/shared/env.desktop"
-import type { HttpChatTransportInitOptions, UIMessageChunk } from "ai"
+import type { ChatTransport, HttpChatTransportInitOptions, UIMessageChunk } from "ai"
 import { HttpChatTransport, parseJsonEventStream, uiMessageChunkSchema } from "ai"
+
+import { isByokActive } from "~/modules/ai-byok/routing"
 
 import { getAIModelState } from "../atoms/session"
 import { AIPersistService } from "../services"
+import { ByokChatTransport } from "./byok-transport"
 import type { BizUIMessage } from "./types"
 
 type TitleHandlerPersistOption = boolean | ((title: string) => void | Promise<void>)
@@ -44,21 +47,65 @@ export function createChatTitleHandler(
  * Create a chat transport for AI SDK
  * This is used by the AbstractChat instance to communicate with AI providers
  */
-export function createChatTransport({ onValue, titleHandler }: CreateChatTransportOptions = {}) {
-  return new ExtendChatTransport({
-    onValue,
-    titleHandler,
-    // Custom fetch configuration
-    api: `${env.VITE_API_URL}/ai/chat`,
-    credentials: "include",
-    // Add selected model to request body
-    body: () => {
-      const modelState = getAIModelState()
-      const { selectedModel } = modelState
+class DynamicChatTransport implements ChatTransport<BizUIMessage> {
+  constructor(
+    private readonly options: CreateChatTransportOptions & {
+      scene?: string
+      getScene?: () => string | undefined
+    } = {},
+  ) {}
 
-      return selectedModel ? { model: selectedModel } : {}
-    },
-  })
+  private resolveScene() {
+    return this.options.getScene?.() ?? this.options.scene
+  }
+
+  sendMessages(options: Parameters<ChatTransport<BizUIMessage>["sendMessages"]>[0]) {
+    const transport = isByokActive()
+      ? new ByokChatTransport(this.resolveScene())
+      : new ExtendChatTransport({
+          onValue: this.options.onValue,
+          titleHandler: this.options.titleHandler,
+          api: `${env.VITE_API_URL}/ai/chat`,
+          credentials: "include",
+          body: () => {
+            const modelState = getAIModelState()
+            const { selectedModel } = modelState
+            return selectedModel ? { model: selectedModel } : {}
+          },
+        })
+
+    return transport.sendMessages(options)
+  }
+
+  reconnectToStream(options: Parameters<ChatTransport<BizUIMessage>["reconnectToStream"]>[0]) {
+    if (isByokActive()) {
+      return new ByokChatTransport(this.resolveScene()).reconnectToStream(options)
+    }
+
+    return new ExtendChatTransport({
+      onValue: this.options.onValue,
+      titleHandler: this.options.titleHandler,
+      api: `${env.VITE_API_URL}/ai/chat`,
+      credentials: "include",
+      body: () => {
+        const modelState = getAIModelState()
+        const { selectedModel } = modelState
+        return selectedModel ? { model: selectedModel } : {}
+      },
+    }).reconnectToStream(options)
+  }
+}
+
+export function createChatTransport({
+  onValue,
+  titleHandler,
+  scene,
+  getScene,
+}: CreateChatTransportOptions & {
+  scene?: string
+  getScene?: () => string | undefined
+} = {}) {
+  return new DynamicChatTransport({ onValue, titleHandler, scene, getScene })
 }
 
 type UIMessageChunkParseResult =

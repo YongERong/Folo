@@ -1,10 +1,12 @@
 /* eslint-disable @eslint-react/no-array-index-key */
-import { UserRole } from "@follow/constants"
+import { isFreeRole } from "@follow/constants"
 import { SettingPaidLevels } from "@follow/shared/settings/constants"
 import { useUserRole } from "@follow/store/user/hooks"
 import type { FC, ReactNode } from "react"
 import * as React from "react"
 import { isValidElement } from "react"
+
+import { useByokUnlocksPaidSettings } from "~/modules/ai-byok/capabilities"
 
 import { SettingActionItem, SettingDescription, SettingInput, SettingSwitch } from "../control"
 import { SettingItemGroup, SettingSectionTitle } from "../section"
@@ -61,6 +63,7 @@ export const createSettingBuilder =
     const { settings } = props
     const settingObject = useSetting()
     const role = useUserRole()
+    const byokUnlocksPaidSettings = useByokUnlocksPaidSettings()
 
     const filteredSettings = settings.filter((i) => !!i)
     return filteredSettings.map((setting, index) => {
@@ -98,7 +101,8 @@ export const createSettingBuilder =
         return null
       }
       const disabledForRole =
-        role === UserRole.Free &&
+        isFreeRole(role) &&
+        !byokUnlocksPaidSettings &&
         "paidLevel" in assertSetting &&
         assertSetting.paidLevel !== undefined &&
         assertSetting.paidLevel !== SettingPaidLevels.Free &&
