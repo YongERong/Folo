@@ -1,3 +1,4 @@
+export * from "./capabilities"
 export * from "./context-builder"
 export * from "./key-vault"
 export * from "./routing"
