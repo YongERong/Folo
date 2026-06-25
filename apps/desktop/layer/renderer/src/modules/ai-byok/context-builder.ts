@@ -66,12 +66,30 @@ export const buildByokContextPrompt = (blocks: AIChatContextBlock[]): string => 
 }
 
 const extractTextFromMessage = (message: BizUIMessage): string => {
-  const textParts = message.parts
-    .filter((part) => part.type === "text")
-    .map((part) => ("text" in part ? part.text : ""))
-    .filter(Boolean)
+  const segments: string[] = []
 
-  return textParts.join("\n").trim()
+  for (const part of message.parts) {
+    switch (part.type) {
+      case "text": {
+        if ("text" in part && part.text) {
+          segments.push(part.text)
+        }
+        break
+      }
+      case "data-rich-text": {
+        const text = part.data?.text?.trim()
+        if (text) {
+          segments.push(text)
+        }
+        break
+      }
+      default: {
+        break
+      }
+    }
+  }
+
+  return segments.join("\n").trim()
 }
 
 export const convertBizMessagesToByokMessages = (

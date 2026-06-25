@@ -81,7 +81,13 @@ describe("BYOK context builder", () => {
             type: "data-block",
             data: [{ id: "block-1", type: "mainEntry", value: "entry-1", disabled: false }],
           },
-          { type: "text", text: "Summarize this entry." },
+          {
+            type: "data-rich-text",
+            data: {
+              state: "{}",
+              text: "Summarize this entry.",
+            },
+          },
         ],
       },
     ]
@@ -92,6 +98,33 @@ describe("BYOK context builder", () => {
         content: expect.stringContaining("Summarize this entry."),
       },
     ])
+  })
+
+  test("convertBizMessagesToByokMessages includes only context when rich text is empty", () => {
+    const messages: BizUIMessage[] = [
+      {
+        id: "msg-1",
+        role: "user",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        parts: [
+          {
+            type: "data-block",
+            data: [{ id: "block-1", type: "mainFeed", value: "feed-1", disabled: false }],
+          },
+          {
+            type: "data-rich-text",
+            data: {
+              state: "{}",
+              text: "   ",
+            },
+          },
+        ],
+      },
+    ]
+
+    const [converted] = convertBizMessagesToByokMessages(messages)
+    expect(converted?.content).toContain("Feed: Sample Feed")
+    expect(converted?.content).not.toContain("Summarize")
   })
 
   test("buildByokSystemPrompt includes timeline prompt for timeline-summary scene", () => {
