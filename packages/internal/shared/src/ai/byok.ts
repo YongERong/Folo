@@ -15,6 +15,7 @@ export type ByokChatMessageInput = {
 }
 
 export type ByokStreamChatInput = {
+  streamId: string
   provider: ByokProviderConfigInput
   modelId: string
   system?: string

@@ -170,8 +170,7 @@ export class AIService extends IpcService {
     context: IpcContext,
     input: ByokStreamChatInput,
   ): Promise<{ streamId: string } | { error: string }> {
-    const streamId = nanoid()
-    const modelId = resolveByokModelId(input.provider.provider, input.modelId)
+    const { streamId } = input
     const textPartId = nanoid()
 
     void this.runStreamChat({
@@ -179,7 +178,7 @@ export class AIService extends IpcService {
       streamId,
       textPartId,
       input,
-      modelId,
+      modelId: resolveByokModelId(input.provider.provider, input.modelId),
     })
 
     return { streamId }

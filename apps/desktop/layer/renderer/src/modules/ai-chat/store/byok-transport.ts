@@ -1,5 +1,6 @@
-import type { ByokStreamChatInput } from "@follow/shared/ai/byok"
+import type { ByokStreamChatInput, ByokStreamEvent } from "@follow/shared/ai/byok"
 import type { ChatTransport, UIMessageChunk } from "ai"
+import { nanoid } from "nanoid"
 
 import { requireIpcServices } from "~/lib/client"
 import {
@@ -11,6 +12,30 @@ import {
 import { listenToByokStream } from "~/modules/ai-byok/stream"
 
 import type { BizUIMessage } from "./types"
+
+const toUiMessageChunk = (event: ByokStreamEvent): UIMessageChunk | null => {
+  switch (event.type) {
+    case "text-start": {
+      return { type: "text-start", id: event.id }
+    }
+    case "text-delta": {
+      return { type: "text-delta", id: event.id, delta: event.delta }
+    }
+    case "text-end": {
+      return { type: "text-end", id: event.id }
+    }
+    case "finish": {
+      return {
+        type: "finish",
+        finishReason: "stop",
+        messageMetadata: event.metadata,
+      }
+    }
+    default: {
+      return null
+    }
+  }
+}
 
 export class ByokChatTransport implements ChatTransport<BizUIMessage> {
   constructor(private readonly scene?: string) {}
@@ -28,20 +53,15 @@ export class ByokChatTransport implements ChatTransport<BizUIMessage> {
       throw new Error("BYOK is enabled but no provider is configured.")
     }
 
+    const streamId = nanoid()
     const request: ByokStreamChatInput = {
+      streamId,
       provider,
       modelId,
       system: buildByokSystemPrompt(this.scene),
       messages: convertBizMessagesToByokMessages(messages),
       personalizePrompt: undefined,
     }
-
-    const startResult = await requireIpcServices().ai.streamChat(request)
-    if ("error" in startResult) {
-      throw new Error(startResult.error)
-    }
-
-    const { streamId } = startResult
 
     return new ReadableStream<UIMessageChunk>({
       start: (controller) => {
@@ -51,29 +71,18 @@ export class ByokChatTransport implements ChatTransport<BizUIMessage> {
           onEvent: (event) => {
             if (disposed) return
 
-            switch (event.type) {
-              case "text-start":
-              case "text-delta":
-              case "text-end": {
-                controller.enqueue(event)
-                break
-              }
-              case "finish": {
-                controller.enqueue({
-                  type: "finish",
-                  finishReason: "stop",
-                  messageMetadata: event.metadata,
-                })
-                controller.close()
-                break
-              }
-              case "error": {
-                controller.error(new Error(event.message))
-                break
-              }
-              default: {
-                break
-              }
+            if (event.type === "error") {
+              controller.error(new Error(event.message))
+              return
+            }
+
+            const chunk = toUiMessageChunk(event)
+            if (!chunk) return
+
+            controller.enqueue(chunk)
+
+            if (event.type === "finish") {
+              controller.close()
             }
           },
           onComplete: () => {
@@ -91,6 +100,22 @@ export class ByokChatTransport implements ChatTransport<BizUIMessage> {
           },
           { once: true },
         )
+
+        // Register the IPC listener before starting the main-process stream.
+        // Otherwise text-start can be emitted before the renderer is listening.
+        void requireIpcServices()
+          .ai.streamChat(request)
+          .then((startResult) => {
+            if (disposed) return
+
+            if ("error" in startResult) {
+              controller.error(new Error(startResult.error))
+            }
+          })
+          .catch((error) => {
+            if (disposed) return
+            controller.error(error instanceof Error ? error : new Error(String(error)))
+          })
       },
     })
   }
