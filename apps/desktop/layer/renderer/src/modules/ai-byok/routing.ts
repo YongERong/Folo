@@ -21,14 +21,19 @@ export const getActiveByokProvider = (): UserByokProviderConfig | null => {
   )
 }
 
-export const isByokActive = (): boolean => {
+export const isByokConfigured = (): boolean => {
   if (!IN_ELECTRON) return false
 
   const byok = getByokSettings()
-  if (!byok.enabled || byok.providers.length === 0) {
+  return byok.enabled && byok.providers.length > 0
+}
+
+export const isByokActive = (): boolean => {
+  if (!isByokConfigured()) {
     return false
   }
 
+  const byok = getByokSettings()
   return byok.providers.some((provider) => providerHasStoredKey(provider.provider))
 }
 

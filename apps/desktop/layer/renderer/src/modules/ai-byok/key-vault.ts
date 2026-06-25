@@ -1,36 +1,47 @@
 import { IN_ELECTRON } from "@follow/shared/constants"
 import type { ByokProviderName } from "@follow/shared/settings/interface"
+import { atom, useAtomValue } from "jotai"
 
 import { requireIpcServices } from "~/lib/client"
+import { jotaiStore } from "~/lib/jotai"
 
-const providersWithKeys = new Set<ByokProviderName>()
+const byokKeyRegistryAtom = atom<ReadonlySet<ByokProviderName>>(new Set<ByokProviderName>())
+
+const setByokKeyRegistry = (providers: Iterable<ByokProviderName>) => {
+  jotaiStore.set(byokKeyRegistryAtom, new Set(providers))
+}
+
+export const useByokKeyRegistry = () => useAtomValue(byokKeyRegistryAtom)
 
 export const refreshByokKeyRegistry = async () => {
-  providersWithKeys.clear()
-
   if (!IN_ELECTRON) {
+    setByokKeyRegistry([])
     return
   }
 
   try {
     const providers = await requireIpcServices().ai.listByokProvidersWithKeys()
-    providers.forEach((provider) => providersWithKeys.add(provider))
+    setByokKeyRegistry(providers)
   } catch (error) {
     console.error("Failed to refresh BYOK key registry:", error)
   }
 }
 
 export const markProviderHasKey = (provider: ByokProviderName, hasKey: boolean) => {
+  const current = jotaiStore.get(byokKeyRegistryAtom)
+  const next = new Set(current)
+
   if (hasKey) {
-    providersWithKeys.add(provider)
-    return
+    next.add(provider)
+  } else {
+    next.delete(provider)
   }
 
-  providersWithKeys.delete(provider)
+  setByokKeyRegistry(next)
 }
 
 export const providerHasStoredKey = (provider: ByokProviderName) => {
-  return providersWithKeys.has(provider)
+  return jotaiStore.get(byokKeyRegistryAtom).has(provider)
 }
 
 export const setByokApiKey = async (provider: ByokProviderName, apiKey: string) => {

@@ -4,6 +4,7 @@ import {
   getActiveByokProvider,
   getConfiguredByokProviders,
   isByokActive,
+  isByokConfigured,
   shouldUseByokForFeature,
 } from "./routing"
 
@@ -32,6 +33,22 @@ describe("BYOK routing", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     providerHasStoredKeyMock.mockReturnValue(true)
+  })
+
+  test("isByokConfigured returns false when BYOK is disabled", () => {
+    getAISettingsMock.mockReturnValue({
+      byok: { enabled: false, providers: [{ provider: "openai" }] },
+    })
+
+    expect(isByokConfigured()).toBe(false)
+  })
+
+  test("isByokConfigured returns true when enabled with providers", () => {
+    getAISettingsMock.mockReturnValue({
+      byok: { enabled: true, providers: [{ provider: "openai" }] },
+    })
+
+    expect(isByokConfigured()).toBe(true)
   })
 
   test("isByokActive returns false when BYOK is disabled", () => {

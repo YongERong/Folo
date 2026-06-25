@@ -8,7 +8,11 @@ import { toast } from "sonner"
 
 import { getAISettings, setAISetting, useAISettingValue } from "~/atoms/settings/ai"
 import { useDialog, useModalStack } from "~/components/ui/modal/stacked/hooks"
-import { deleteByokApiKey, stripApiKeyFromProviderConfig } from "~/modules/ai-byok/key-vault"
+import {
+  deleteByokApiKey,
+  refreshByokKeyRegistry,
+  stripApiKeyFromProviderConfig,
+} from "~/modules/ai-byok/key-vault"
 
 import { ByokProviderItem } from "./ByokProviderItem"
 import { ByokProviderModalContent } from "./ByokProviderModalContent"
@@ -25,11 +29,15 @@ export const ByokSection = () => {
   const { present } = useModalStack()
   const { ask } = useDialog()
 
-  const handleToggleEnabled = (enabled: boolean) => {
+  const handleToggleEnabled = async (enabled: boolean) => {
     setAISetting("byok", {
       ...byok,
       enabled,
     })
+
+    if (enabled) {
+      await refreshByokKeyRegistry()
+    }
   }
 
   const handleAddProvider = () => {
@@ -49,6 +57,7 @@ export const ByokSection = () => {
               ...updatedByok,
               providers: [...updatedByok.providers, sanitized],
             })
+            await refreshByokKeyRegistry()
             toast.success(t("byok.providers.added"))
             dismiss()
           }}
@@ -79,6 +88,7 @@ export const ByokSection = () => {
               ...updatedByok,
               providers: updatedProviders,
             })
+            await refreshByokKeyRegistry()
             toast.success(t("byok.providers.updated"))
             dismiss()
           }}
@@ -108,6 +118,7 @@ export const ByokSection = () => {
         ...currentByok,
         providers: updatedProviders,
       })
+      await refreshByokKeyRegistry()
       toast.success(t("byok.providers.deleted"))
     }
   }

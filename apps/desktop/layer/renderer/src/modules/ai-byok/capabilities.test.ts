@@ -3,17 +3,31 @@ import { beforeEach, describe, expect, test, vi } from "vitest"
 
 import { canUseAiTranslationForRole } from "./capabilities"
 
-const { isByokActiveMock, isByokActiveInStoreMock } = vi.hoisted(() => ({
+const { isByokActiveMock, isByokActiveInStoreMock, isByokConfiguredMock } = vi.hoisted(() => ({
   isByokActiveMock: vi.fn(),
   isByokActiveInStoreMock: vi.fn(),
+  isByokConfiguredMock: vi.fn(),
 }))
 
 vi.mock("./routing", () => ({
   isByokActive: isByokActiveMock,
+  isByokConfigured: isByokConfiguredMock,
+}))
+
+vi.mock("./key-vault", () => ({
+  useByokKeyRegistry: () => new Set(),
 }))
 
 vi.mock("@follow/store/context", () => ({
   isByokActiveInStore: isByokActiveInStoreMock,
+}))
+
+vi.mock("@follow/store/user/hooks", () => ({
+  useUserRole: () => {},
+}))
+
+vi.mock("~/atoms/settings/ai", () => ({
+  useAISettingValue: () => ({}),
 }))
 
 describe("BYOK capabilities", () => {
@@ -21,6 +35,7 @@ describe("BYOK capabilities", () => {
     vi.clearAllMocks()
     isByokActiveMock.mockReturnValue(false)
     isByokActiveInStoreMock.mockReturnValue(false)
+    isByokConfiguredMock.mockReturnValue(false)
   })
 
   test("allows translation for paid roles without BYOK", () => {
@@ -35,6 +50,11 @@ describe("BYOK capabilities", () => {
 
   test("allows free users when BYOK is active", () => {
     isByokActiveMock.mockReturnValue(true)
+    expect(canUseAiTranslationForRole(UserRole.Free)).toBe(true)
+  })
+
+  test("allows free users when BYOK is configured", () => {
+    isByokConfiguredMock.mockReturnValue(true)
     expect(canUseAiTranslationForRole(UserRole.Free)).toBe(true)
   })
 })

@@ -5,19 +5,28 @@ import { useUserRole } from "@follow/store/user/hooks"
 
 import { useAISettingValue } from "~/atoms/settings/ai"
 
-import { isByokActive } from "./routing"
+import { useByokKeyRegistry } from "./key-vault"
+import { isByokActive, isByokConfigured } from "./routing"
 
 export const canUseAiTranslationForRole = (role?: UserRole | null): boolean => {
-  return isByokActiveInStore() || isByokActive() || !isFreeRole(role)
+  return isByokActiveInStore() || isByokActive() || isByokConfigured() || !isFreeRole(role)
 }
 
 export const useIsByokActive = (): boolean => {
   useAISettingValue()
+  useByokKeyRegistry()
   return isByokActive()
+}
+
+export const useByokUnlocksPaidSettings = (): boolean => {
+  useAISettingValue()
+  useByokKeyRegistry()
+  return isByokActive() || isByokConfigured()
 }
 
 export const useCanUseAiTranslation = (): boolean => {
   const role = useUserRole()
   useAISettingValue()
+  useByokKeyRegistry()
   return canUseAiTranslationForRole(role)
 }
